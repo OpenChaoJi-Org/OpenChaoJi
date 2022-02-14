@@ -39,15 +39,30 @@ typedef short err_Cj;
 #define LM_TYPE		(1)
 #define RSM_TYPE	(0)
 
+// CAN Source Address defintions.
+#define MACID_EVCC	0x5f
+#define MACID_SECC	0x25
 // ChaoJi communication states defintions.
 // Connect(s0) data transfer(s1) wait ack(s2) wait end(s3) connection close(s4).
 enum Cj_Com_state{
-	RSM_S0	= 0,
-	RSM_S1,
-	RSM_S2,
-	LM_S0	= 10,
-	LM_S1,
-	LM_S2,
+//	RSM_S0	= 0,
+//	RSM_S1,
+//	RSM_S2,
+	RSM_IDLE	= 0,
+	RSM_WAIT_RESP_ACK,
+	RSM_SEND_END,
+	RSM_SEND_FAILURE,
+//	LM_S0	= 10,
+//	LM_S1,
+//	LM_S2,
+	LM_IDLE		= 10,
+	LM_SENT_CONN,
+	LM_RCVD_RESP,
+	LM_ESTABLISHED,
+	LM_WAIT_RESP_ACK,
+	LM_WAIT_FIN_ACK,
+	LM_CLOSED,
+	LM_SEND_FAILURE,
 	URSM_S0	= 100,
 	URSM_S1,
 	URSM_S2
@@ -57,7 +72,7 @@ enum Cj_Com_state{
 struct ChaoJi_RM_Mcb
 {
 	enum Cj_Com_state cj_rm_com_state;
-	uint8_t	MsgType; 		// 0: RSM_TYPE, 1: LM_TYPE.
+	uint8_t	msg_type; 		// 0: RSM_TYPE, 1: LM_TYPE.
 	uint8_t port;
 	uint8_t pgi;
     uint8_t sm_data[8];
@@ -73,11 +88,21 @@ struct ChaoJi_RM_Mcb
 	err_Cj (* recv)(struct ChaoJi_RM_Mcb *rm_Mcb); // Call back function to notify appliacation layer recv have been made.
 	uint8_t* snd_buf;		// Send the data buffer..
     uint32_t snd_len;		// Send the byte size of data.
-    uint32_t snd_state;		// Send states.
+    enum Cj_Com_state snd_state;// Send states.
+    uint32_t snd_total_frames;
+	uint32_t snd_frame_cnt;
 	uint32_t snd_currSN; 	// Send the current serial number.
 	uint32_t snd_time_out; 	// Send the timeout.
 	uint32_t snd_max_timer; // Send the maxium timer round.
 	err_Cj (* sent)(struct ChaoJi_RM_Mcb *rm_Mcb); // Call back func to notify application layer.
+	uint32_t t1_intvl;	//RSM ACK massage timeout and resend interval time setting.or LMS_T1 is LM Send information data interval time setting.
+	int32_t t1_cnt;	
+	uint32_t t2_intvl;// LMS_T2 LM control message or data message timeout setting.
+	int32_t t2_cnt;
+	uint32_t t3_intvl;// LMS_T3 LM Send the maxium timeout setting.
+	int32_t t3_cnt;
+	uint8_t resend_times;
+	uint8_t resend_cnt;
 };
 
 // Data structure of unreliable Message

@@ -55,7 +55,7 @@ void ChaoJi_URM_Send_Notify(struct ChaoJi_URM_Mcb *Msgcb);
 * @param   err Pointer to a error,unused.
 * @retval  ERR_OK If the transmit data is written to the buffer.
 */
-err_Cj ChaoJi_RM_write(struct ChaoJi_RM_Mcb *Msgcb, u8_t* data, u32_t length, err_Cj *err);
+err_Cj ChaoJi_RM_write(struct ChaoJi_RM_Mcb *Msgcb, uint8_t* data, uint32_t length, err_Cj *err);
 
 /**
 * @brief   unreliable message send, Deal with application data buffer and Convert the application 
@@ -66,7 +66,7 @@ err_Cj ChaoJi_RM_write(struct ChaoJi_RM_Mcb *Msgcb, u8_t* data, u32_t length, er
 * @param   pdu Pointer to the can link protocol data unit frame.
 * @retval  ERR_OK If the transmit data is written to the buffer.
 */
-err_Cj ChaoJi_URSM_write(struct ChaoJi_Urm_Mcb *Msgcb, uint8_t* data, uint32_t length, struct Can_Pdu *pdu);
+err_Cj ChaoJi_URSM_send(struct ChaoJi_Urm_Mcb *Msgcb, uint8_t* data, uint32_t length, struct Can_Pdu *pdu);
 
 /**
 * @brief   Relaible message send state machine, connection established, sending data, pause, 
@@ -79,7 +79,9 @@ err_Cj ChaoJi_URSM_write(struct ChaoJi_Urm_Mcb *Msgcb, uint8_t* data, uint32_t l
 * @param   pdu Pointer to the output can link protocol data unit,the pdu will be sent.
 * @retval  reliable message send state,define in Cj_Com_state
 */
-Cj_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb, struct Can_Pdu *pdu);
+//Cj_Com_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb, struct Can_Pdu *pdu);
+Cj_Com_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb);
+
 
 /**
 * @brief   Deal with data link layer to make real traffic by using CAN PDU，
@@ -94,7 +96,7 @@ err_Cj ChaoJi_Output(struct Can_Pdu *pdu);
 * @param   Msgcb Pointer to a ChaoJi_RM_Mcb struct body.
 * @retval  reliable message send state,define in Cj_Com_state
 */
-Cj_state ChaoJi_RM_GetSendState(struct ChaoJi_RM_Mcb *Msgcb);
+Cj_Com_state ChaoJi_RM_GetSendState(struct ChaoJi_RM_Mcb *Msgcb);
 
 
 /*some example for how to use send*/
@@ -111,18 +113,19 @@ void example(void)
 
 	// Send
 	uint8_t data1[] = {1, 2, 3, 4, 5,6,7,8,9};
+	lm_Mcb->t1_intvl = 8;
+	lm_Mcb->t2_intvl = 100;
+	lm_Mcb->t3_intvl = 10000;
+	lm_Mcb->resend_times = 3;//超时重发次数
 	ChaoJi_RM_write(lm_Mcb, data1, sizeof(data1), &errVal);
-	ChaoJi_RM_SendProcess(lm_Mcb, pdu);
-	ChaoJi_Output(pdu);
 
 	uint8_t data2[] = {1, 2, 3, 4, 5};
+	lm_Mcb->t1_intvl = 250;	 //重发间隔
+	lm_Mcb->resend_times = 4;//超时重发次数
 	ChaoJi_RM_write(rsm_Mcb, data2, sizeof(data2), &errVal);
-	ChaoJi_RM_SendProcess(rsm_Mcb, pdu);
-	ChaoJi_Output(pdu);
-
+	
 	uint8_t data3[] = {1, 2, 3, 4, 5,6,7};
-	ChaoJi_URSM_write(ursm_Mcb, data3, sizeof(data3), pdu);
-	ChaoJi_Output(pdu);
+	ChaoJi_URSM_send(ursm_Mcb, data3, sizeof(data3),);
 };
 
 #endif // CHAOJI_SEND_H.
