@@ -35,6 +35,7 @@ typedef short err_Cj;
 #define ERR_ERR		(-1)
 
 // Message type defintions.
+#define URSM_TYPE	(2)
 #define LM_TYPE		(1)
 #define RSM_TYPE	(0)
 
@@ -59,9 +60,11 @@ struct ChaoJi_RM_Mcb
 	uint8_t	MsgType; 		// 0: RSM_TYPE, 1: LM_TYPE.
 	uint8_t port;
 	uint8_t pgi;
+    uint8_t sm_data[8];
 	uint8_t len;
 	uint8_t *recv_buf;
 	uint16_t tfs;			// Total fram size: ACK's total frame size.
+    uint16_t rcved_tfs;		// recved Total fram size: ACK's total frame size.
 	uint16_t crt_seq;		// Current sequence no: ACK's start sequence number included.
 	uint16_t rst_seq;		// Request seq no.
 	uint8_t *recved_flag;	// Received flag: include all ACK, NACK and ANDACK, number of pending data frames and its initial sequence number.
@@ -78,11 +81,12 @@ struct ChaoJi_RM_Mcb
 };
 
 // Data structure of unreliable Message
-struct ChaoJi_Urm_Mcb
+struct ChaoJi_URM_Mcb
 {
 	enum Cj_Com_state cj_urm_com_state;
 	uint8_t port;
 	uint8_t pgi;
+    uint8_t sm_data[8];
 	uint8_t len;
 	uint8_t *recv_buf;
 	uint16_t tfs;			// Total fram size.
@@ -108,7 +112,7 @@ typedef union
 	struct
 	{
 		uint32_t sa		:8; // Source address.
-		uint32_t ps		:8; // Destination address.
+        uint32_t ps		:8; // Destination address.
 		uint32_t pf		:8; // PDU type.
 		uint32_t dp		:1; // Data Page.
 		uint32_t edp	:1; // Extended data page.

@@ -28,6 +28,13 @@
 #define CHAOJI_RECV_H
 
 #include "ChaoJi_Trans.h"
+#include "malloc.h"
+
+
+#define SM_ACK (0)
+#define LM_ACK (1)
+#define LM_NACK (2)
+#define LM_EndACK (3)
 
 
 /**
@@ -75,7 +82,7 @@ err_Cj ChaoJi_RecvProcess(struct Can_Pdu * Pdu);
  * @param   Pointer to a ChaoJi_RM_Mcb struct.
  * @retval  None.
  */
-err_Cj ChaoJi_RSM_Recv(struct ChaoJi_RM_Mcb *Msgcb);
+err_Cj ChaoJi_RSM_Recv(struct Can_Pdu * Pdu,struct ChaoJi_RM_Mcb *Msgcb);
 
 
 /**
@@ -84,7 +91,7 @@ err_Cj ChaoJi_RSM_Recv(struct ChaoJi_RM_Mcb *Msgcb);
  * @param   Pointer to a ChaoJi_URM_Mcb struct.
  * @retval  None.
  */
-err_Cj ChaoJi_URSM_Recv(struct ChaoJi_URM_Mcb *Msgcb);
+err_Cj ChaoJi_URSM_Recv(struct Can_Pdu * Pdu,struct ChaoJi_URM_Mcb *Msgcb);
 
 
 /**
@@ -94,14 +101,21 @@ err_Cj ChaoJi_URSM_Recv(struct ChaoJi_URM_Mcb *Msgcb);
  * @param   Pointer to a ChaoJi_RM_Mcb struct.
  * @retval  None.
  */
-err_Cj ChaoJi_LM_Recv(struct ChaoJi_RM_Mcb *Msgcb);
+err_Cj ChaoJi_LM_Recv(struct Can_Pdu * Pdu,struct ChaoJi_RM_Mcb *Msgcb);
 
 
 /**
- * @brief   Handle all kinds of ACK NACK message,eg RSM_ACK, LM_ACK, NACK. Set flags to the sent data and put them into the data structure.
+ * @brief   Handle all RSM_ACK messag.
  * @param   Pointer to a ChaoJi_RM_Mcb struct.
  * @retval  None.
  */
-err_Cj ChaoJi_ACK_Recv(struct ChaoJi_RM_Mcb *Msgcb);
+err_Cj ChaoJi_ACK_SM_Recv(struct Can_Pdu * Pdu,struct ChaoJi_RM_Mcb *Msgcb);
+
+/**
+ * @brief   Handle all kinds of LM_ACK message,eg LM_ACK, NACK. Set flags to the sent data and put them into the data structure.
+ * @param   Pointer to a ChaoJi_RM_Mcb struct.
+ * @retval  None.
+ */
+err_Cj ChaoJi_ACK_LM_Recv(struct Can_Pdu * Pdu,struct ChaoJi_RM_Mcb *Msgcb);
 
 #endif // CHAOJI_RECV_H.
