@@ -79,18 +79,18 @@ err_Cj ChaoJi_RM_write(struct ChaoJi_RM_Mcb *Msgcb, uint8_t* data, uint32_t leng
 	if (Msgcb->snd_buf == NULL){
 		return ERR_ERR;
 	}
-	//发送数据缓存
+	//put the sending data into buffer
 	memcpy(Msgcb->snd_buf,data,length);
 
-	if (length <= 8)//短消息处理
+	if (length <= 8)//reliable short message
 	{
 		Msgcb->msg_type = RSM_TYPE;
-		Msgcb->snd_state = RSM_IDLE;
 		Msgcb->snd_len = length;
 		error = RSM_SentData(Msgcb);
+		Msgcb->snd_state = RSM_WAIT_RESP_ACK;
 		Msgcb->t1_cnt = Msgcb->t1_intvl;
 	} 
-	else //长消息处理
+	else //long message
 	{
 		Msgcb->msg_type = LM_TYPE;
 		Msgcb->snd_len = length;
@@ -98,6 +98,7 @@ err_Cj ChaoJi_RM_write(struct ChaoJi_RM_Mcb *Msgcb, uint8_t* data, uint32_t leng
 		Msgcb->snd_frame_cnt = 0;
 
 		//发送LM(0),开启 LMS_T2,LMS_T3,进入S0
+		//send LM(0),start the timer LMS_T2 and LMS_T3
 		error = LM_DoConnect(Msgcb);
 		Msgcb->t1_cnt = -1;
 		Msgcb->t2_cnt = Msgcb->t2_intvl;
@@ -128,7 +129,6 @@ err_Cj ChaoJi_URSM_write(struct ChaoJi_Urm_Mcb *Msgcb, uint8_t* data, uint32_t l
 
 	return error;
 }*/
-
 err_Cj ChaoJi_URSM_send(struct ChaoJi_Urm_Mcb *Msgcb, uint8_t* data, uint32_t length)
 {
 	struct Can_Pdu pdu;
@@ -164,7 +164,7 @@ err_Cj ChaoJi_URSM_send(struct ChaoJi_Urm_Mcb *Msgcb, uint8_t* data, uint32_t le
 }
 
 //1ms周期运行任务，主要维护可靠消息的周期发送定时器、超时定时器，定时时间到调用对应状态机执行
-void ChaoJi_RSM_1msTimeTick(void)
+void ChaoJi_RM_1msTimeTick(void)
 {
 	struct ChaoJi_RM_Mcb *Msgcb;
 
@@ -209,12 +209,12 @@ enum Cj_Com_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 	u8_t i;
 	err_Cj error;
 	
-	//要发送短消息处理
 	if (Msgcb->msg_type == RSM_TYPE)
 	{
 		switch (Msgcb->snd_state)
 		{
-			case RSM_WAIT_RESP_ACK://发送请求
+			case RSM_WAIT_RESP_ACK://wait for the receiver's respond
+			
 				if (Msgcb->recved_flag == URM_ACK){
 					Msgcb->t1_cnt = -1;
 					Msgcb->resend_cnt = 0;
@@ -222,8 +222,9 @@ enum Cj_Com_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 				}
 				
 				if (Msgcb->t1_cnt == 0){
-					//完成信息发送后，等待接收方URM_ACK应答确认,T2时间超时后重发本次传输的最后一帧，连续出现4次超时后
+					//完成信息发送后，等待接收方URM_ACK应答确认,T1时间超时后重发本次传输的消息，连续出现4次超时后
 					//放弃连接，本次发送失败
+					//when T1 timer expires,resend message until reached the number of retransmissions;
 					Msgcb->resend_cnt++;
 					if (Msgcb->resend_cnt <= Msgcb->resend_times){
 						error = RSM_SentData(Msgcb);
@@ -239,18 +240,14 @@ enum Cj_Com_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 		}
 	}
 
-	//要发送长消息处理
 	if (Msgcb->msg_type == LM_TYPE)
 	{
 		switch (Msgcb->snd_state)
 		{
-			case LM_IDLE://发送请求
-				
-				break;
-				
-			case LM_SENT_CONN://发送连接
+			case LM_SENT_CONN:
 				if (Msgcb->recved_flag == LM_ACK){
 					//根据应答发送 LM(n), send_cnt 置 1. 开启LMS T1,关闭 LMS_T2, 进入S1
+					//send LM(n),set the send_cnt to 1.start the timer LMS_T1 and LMS_T2
 					error = LM_SentData(Msgcb,Msgcb->crt_seq);
 					Msgcb->snd_frame_cnt = 1;
 					Msgcb->t1_cnt = Msgcb->t1_intvl;
@@ -260,35 +257,40 @@ enum Cj_Com_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 				
 				if (Msgcb->recved_flag == NACK){
 					LM_CloseConnect(Msgcb);
+					Msgcb->snd_state = LM_SEND_FAILURE;
 				}
 				
 				if (Msgcb->t2_cnt == 0)
 				{	
 					Msgcb->resend_cnt++;
-					//3次重发
+					//when timer2 expires,resend message until reached the number of retransmissions;
 					if (Msgcb->resend_cnt <= Msgcb->resend_times){
-						//发	送LM(0), 重置LMS_T2,进入S0
+						//send LM(0), 重置LMS_T2,进入S0
+						//send LM(0) connect, start the timer LMS_T2
 						LM_DoConnect(Msgcb);
 						Msgcb->t2_cnt = Msgcb->t2_intvl;
 					}
 					else{
-						//3次重发超时，结束本次发送
+						//重发超时，结束本次发送
 						LM_SentNAck(Msgcb);
 						LM_CloseConnect(Msgcb);
+						Msgcb->snd_state = LM_SEND_FAILURE;
 					}
 				}
 				
 				if (Msgcb->t3_cnt == 0)
 				{
-					//长消息传输超时，结束本次发送
+					//the timer3 expires,the long message sending timeout failed
 					LM_SentNAck(Msgcb);
 					LM_CloseConnect(Msgcb);
+					Msgcb->snd_state = LM_SEND_FAILURE;
 				}
 				break;
 				
-			case LM_ESTABLISHED:	//数据传输状态
+			case LM_ESTABLISHED:	//data transmission
 				if (Msgcb->recved_flag == LM_ACK){
-					//保存k,根据应答发送LM(n), send_cnt置1,开启LMS_T1,关LMS_T2,进入S1
+					//保存k,根据应答发送LM(n), send_cnt置1,开启LMS_T1,关LMS_T2,保持S1
+					//after received LM_ACK,start sending LM(n) data frame, set the send_cnt to 1,start the timer LMS_T1 and close timer LMS_T2.
 					error = LM_SentData(Msgcb,Msgcb->crt_seq);
 					Msgcb->snd_frame_cnt = 1;
 					Msgcb->t1_cnt = Msgcb->t1_intvl;
@@ -297,20 +299,28 @@ enum Cj_Com_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 				
 				if (Msgcb->recved_flag == NACK){
 					LM_CloseConnect(Msgcb);
+					Msgcb->snd_state = LM_SEND_FAILURE;
 				}
 
 				if (Msgcb->t1_cnt == 0)
 				{
-					//期望发送为长消息最后一帧，进入等待结束确认状态
+					//期望发送为长消息最后一帧
+					//send the last frame of the LM
 					if ((Msgcb->snd_frame_cnt + Msgcb->crt_seq - 1) == Msgcb->snd_total_frames){
+						//发送LM(lm_tfra),send_cnt加1，关闭LMS_T1,开启LMS_T2,进入S3等待结束确认状态
+						error = LM_SentData(Msgcb,Msgcb->snd_total_frames);
 						Msgcb->snd_frame_cnt++;
 						Msgcb->t1_cnt = -1;
 						Msgcb->t1_cnt = Msgcb->t2_intvl;
 						Msgcb->snd_state = LM_WAIT_FIN_ACK;
 						Msgcb->resend_cnt = 0;
 					}
-					//期望发送帧为接收方请求的最后一帧，且非长消息最后一帧,进入等待应答确认状态
+					//期望发送帧为接收方请求的最后一帧，且非长消息最后一帧
+					//send the last frame requested by the receiver
 					else if (Msgcb->snd_frame_cnt == Msgcb->tfs){
+						//发送 LM(n+send_cnt),send_cnt加1,关闭LMS_T1,开启LMS_T2,进入S2等待应答确认状态
+						//send LM(n+send_cnt),the send_cnt add 1,close the timer LMS_T1,start the timer LMS_T2
+						error = LM_SentData(Msgcb,Msgcb->crt_seq + Msgcb->snd_frame_cnt);
 						Msgcb->snd_frame_cnt++;
 						Msgcb->t1_cnt = -1;
 						Msgcb->t1_cnt = Msgcb->t2_intvl;
@@ -318,7 +328,8 @@ enum Cj_Com_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 						Msgcb->resend_cnt = 0;
 					}
 					else{
-						//未结束，继续发送
+						//发送LM(n+send_cnt),send_cnt加1,重置LMS_T1,保持 S1
+						//data sending,send LM(n+send_cnt),the send_cnt add 1,reset the timer LMS_T1
 						error = LM_SentData(Msgcb,Msgcb->crt_seq + Msgcb->snd_frame_cnt);
 						Msgcb->snd_frame_cnt++;
 						Msgcb->t1_cnt = Msgcb->t1_intvl;
@@ -327,26 +338,32 @@ enum Cj_Com_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 				
 				if (Msgcb->t3_cnt == 0)
 				{
-					//长消息传输超时，结束本次发送
+					//the timer3 expires,the long message sending timeout failed
 					LM_SentNAck(Msgcb);
 					LM_CloseConnect(Msgcb);
+					Msgcb->snd_state = LM_SEND_FAILURE;
 				}
 				break;
 
-			case LM_WAIT_RESP_ACK:	//等待应答确认状态
+			case LM_WAIT_RESP_ACK:
 				if (Msgcb->recved_flag == LM_ACK){
 					//根据应答调整LM的帧序号为n, send_cnt 置 1, 开启LMS_T1,关闭LMS_T2, 进入S1
+					//after received LM_ACK,start sending LM(n) data frame, set the send_cnt to 1,start the timer LMS_T1,close LMS_T2
 					error = LM_SentData(Msgcb,Msgcb,Msgcb->crt_seq);
 					Msgcb->snd_frame_cnt = 1;
 					Msgcb->t1_cnt = Msgcb->t1_intvl;
 					Msgcb->t2_cnt = -1;
 					Msgcb->snd_state = LM_ESTABLISHED;
 				}
-
+				
+				//收到NACK报文，发送失败关闭连接，进入发送失败状态
+				//Received a NACK message, failed to send and closed the connection
 				if (Msgcb->recved_flag == LM_NACK){
 					LM_CloseConnect(Msgcb);
+					Msgcb->snd_state = LM_SEND_FAILURE;
 				}
 
+				//when timer2 expires,resend message until reached the number of retransmissions;
 				if (Msgcb->t2_cnt == 0){
 					//完成信息发送后，等待接收方LM_ACK,T2时间超时后重发本次传输的最后一帧，连续出现3次超时后
 					//发送LM_NACK放弃连接
@@ -358,13 +375,16 @@ enum Cj_Com_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 					else{
 						LM_SentNAck(Msgcb);
 						LM_CloseConnect(Msgcb);
+						Msgcb->snd_state = LM_SEND_FAILURE;
 					}
 				}
-
-				if (Msgcb->t3_cnt == 0)
-				{
+				
+				if (Msgcb->t3_cnt == 0){
+					//LMS_T3 定时器到,发送LM_ NACK, 进入发送失败状态
+					//the timer3 expires,the long message sending timeout failed
 					LM_SentNAck(Msgcb);
 					LM_CloseConnect(Msgcb);
+					Msgcb->snd_state = LM_SEND_FAILURE;
 				}
 
 				break;
@@ -379,10 +399,21 @@ enum Cj_Com_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 					Msgcb->snd_state = LM_ESTABLISHED;
 				}
 
-				if (Msgcb->recved_flag == LM_NACK || Msgcb->recved_flag == LM_END_OF_ACK){
+				//收到NACK报文，发送失败关闭连接，进入发送失败状态
+				//Received a NACK message, failed to send and closed the connection
+				if (Msgcb->recved_flag == LM_NACK){
 					LM_CloseConnect(Msgcb);
+					Msgcb->snd_state = LM_SEND_FAILURE;
 				}
-				
+
+				//收到结束确认报文，发送成功关闭连接，进入空闲状态
+				//Received a LM_END_OF_ACK message, successfully send and closed the connection
+				if (Msgcb->recved_flag == LM_END_OF_ACK){
+					LM_CloseConnect(Msgcb);
+					Msgcb->snd_state = LM_SEND_END;
+				}
+
+				//when timer2 expires,resend message until reached the number of retransmissions;
 				if (Msgcb->t2_cnt == 0){
 					//完成信息发送后，等待接收方LM_ACK或LM_EndofACK,T2时间超时后重发本次传输的最后一帧，连续出现3次超时后
 					//发送LM_NACK放弃连接
@@ -393,13 +424,16 @@ enum Cj_Com_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 					else{
 						LM_SentNAck(Msgcb);
 						LM_CloseConnect(Msgcb);
+						Msgcb->snd_state = LM_SEND_FAILURE;
 					}
 				}
-
-				if (Msgcb->t3_cnt == 0)
-				{
+				
+				if (Msgcb->t3_cnt == 0){
+					//LMS_T3 定时器到,发送LM_ NACK,发送超时进入发送失败状态
+					//the timer3 expires,the long message sending timeout failed
 					LM_SentNAck(Msgcb);
 					LM_CloseConnect(Msgcb);
+					Msgcb->snd_state = LM_SEND_FAILURE;
 				}
 				break;
 
@@ -428,8 +462,8 @@ err_Cj RSM_SentData(struct ChaoJi_RM_Mcb *Msgcb)
 	pdu->can_id.bit.edp = 0;
 	pdu->can_id.bit.p = 3;
 	pdu->can_id.bit.rsvd = 0;
-	
-	pdu->can_dlc = Msgcb->snd_len;
+
+	pdu->can_dlc = 8;
 
 	for (i = 0;i < 8;i++){
 		if (i < Msgcb->snd_len){
@@ -439,7 +473,6 @@ err_Cj RSM_SentData(struct ChaoJi_RM_Mcb *Msgcb)
 			pdu->data[i] = 0xff;
 		}
 	}
-
 	error = ChaoJi_Output(&pdu);
 	return error;
 }
@@ -484,7 +517,6 @@ err_Cj LM_CloseConnect(struct ChaoJi_RM_Mcb *Msgcb)
 	Msgcb->t2_cnt = -1;
 	Msgcb->t3_cnt = -1;
 	Msgcb->snd_frame_cnt = 0;
-	Msgcb->snd_state = LM_IDLE;
 	Msgcb->resend_cnt = 0;
 	
 	ChaoJi_pbuf_free(Msgcb->snd_buf);
@@ -588,15 +620,14 @@ enum Cj_Com_state ChaoJi_RM_GetSendState(struct ChaoJi_RM_Mcb *Msgcb)
 	return state;
 }
 
-//内存分配
-void* ChaoJi_pbuf_alloc(uint16_t length)
+/*allocate memory*/
+void* ChaoJi_pbuf_alloc(uint16_t length)//TBD
 {
-	//返回一个值
 	return ;
 }
 
-//内存释放
-uint8_t ChaoJi_pbuf_free(void* pbuff)
+/*free memory*/
+uint8_t ChaoJi_pbuf_free(void* pbuff)//TBD
 {
 	
 }
@@ -629,22 +660,21 @@ void example(void)
 	ChaoJi_URSM_write(ursm_Mcb, data3, sizeof(data3), pdu);
 	ChaoJi_Output(pdu);
 */
-
 	// Send
 	uint8_t data1[] = {1, 2, 3, 4, 5,6,7,8,9};
-	lm_Mcb->t1_intvl = 8;
-	lm_Mcb->t2_intvl = 100;
-	lm_Mcb->t3_intvl = 10000;
-	lm_Mcb->resend_times = 3;//超时重发次数
+	lm_Mcb->t1_intvl = 8;	//LM传输中信息帧发送间隔
+	lm_Mcb->t2_intvl = 100;	//控制帧超时间隔
+	lm_Mcb->t3_intvl = 10000;//长消息传输超时间隔
+	lm_Mcb->resend_times = 3;//LM超时重发次数
 	ChaoJi_RM_write(lm_Mcb, data1, sizeof(data1), &errVal);
 
 	uint8_t data2[] = {1, 2, 3, 4, 5};
-	lm_Mcb->t1_intvl = 250;	 //重发间隔
-	lm_Mcb->resend_times = 4;//超时重发次数
+	rsm_Mcb->t1_intvl = 250;	 //重发间隔
+	rsm_Mcb->resend_times = 4;//超时重发次数
 	ChaoJi_RM_write(rsm_Mcb, data2, sizeof(data2), &errVal);
 	
 	uint8_t data3[] = {1, 2, 3, 4, 5,6,7};
-	ChaoJi_URSM_send(ursm_Mcb, data3, sizeof(data3),);
+	ChaoJi_URSM_send(ursm_Mcb, data3, sizeof(data3), &errVal);
 };
 
 #endif // CHAOJI_SEND_H.

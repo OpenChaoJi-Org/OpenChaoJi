@@ -61,7 +61,7 @@ enum Cj_Com_state{
 	LM_ESTABLISHED,
 	LM_WAIT_RESP_ACK,
 	LM_WAIT_FIN_ACK,
-	LM_CLOSED,
+	LM_SEND_END,
 	LM_SEND_FAILURE,
 	URSM_S0	= 100,
 	URSM_S1,
@@ -92,16 +92,14 @@ struct ChaoJi_RM_Mcb
     uint32_t snd_total_frames;
 	uint32_t snd_frame_cnt;
 	uint32_t snd_currSN; 	// Send the current serial number.
-	uint32_t snd_time_out; 	// Send the timeout.
-	uint32_t snd_max_timer; // Send the maxium timer round.
 	err_Cj (* sent)(struct ChaoJi_RM_Mcb *rm_Mcb); // Call back func to notify application layer.
 	uint32_t t1_intvl;	//RSM ACK massage timeout and resend interval time setting.or LMS_T1 is LM Send information data interval time setting.
-	int32_t t1_cnt;	
+	int32_t t1_cnt;		//Timer1 counts,if the value is set to -1,Timer1 is off;
 	uint32_t t2_intvl;// LMS_T2 LM control message or data message timeout setting.
-	int32_t t2_cnt;
+	int32_t t2_cnt;	//Timer2 counts,if the value is set to -1,Timer2 is off;
 	uint32_t t3_intvl;// LMS_T3 LM Send the maxium timeout setting.
-	int32_t t3_cnt;
-	uint8_t resend_times;
+	int32_t t3_cnt;	//Timer3 counts,if the value is set to -1,Timer3 is off;
+	uint8_t resend_times;//message timeout retransmission times
 	uint8_t resend_cnt;
 };
 
