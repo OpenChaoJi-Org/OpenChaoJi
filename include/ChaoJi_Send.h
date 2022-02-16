@@ -63,10 +63,10 @@ err_Cj ChaoJi_RM_write(struct ChaoJi_RM_Mcb *Msgcb, uint8_t* data, uint32_t leng
 * @param   Msgcb Pointer to a ChaoJi_URM_Mcb struct,for the unreliable message to send data.
 * @param   data Pointer to the data to be sending.
 * @param   length Pointer to data length in bytes.
-* @param   pdu Pointer to the can link protocol data unit frame.
-* @retval  ERR_OK If the transmit data is written to the buffer.
+* @param   err Pointer to a error,unuse.
+* @retval  ERR_OK If there is an error in sending.
 */
-err_Cj ChaoJi_URSM_send(struct ChaoJi_Urm_Mcb *Msgcb, uint8_t* data, uint32_t length, struct Can_Pdu *pdu);
+err_Cj ChaoJi_URSM_send(struct ChaoJi_Urm_Mcb *Msgcb, uint8_t* data, uint32_t length, err_Cj *err);
 
 /**
 * @brief   Relaible message send state machine, connection established, sending data, pause, 
@@ -91,41 +91,12 @@ Cj_Com_state ChaoJi_RM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb);
 */
 err_Cj ChaoJi_Output(struct Can_Pdu *pdu);
 
-  /**
+/**
 * @brief   Polling method to get the sending procedure status for application layer.
 * @param   Msgcb Pointer to a ChaoJi_RM_Mcb struct body.
 * @retval  reliable message send state,define in Cj_Com_state
 */
 Cj_Com_state ChaoJi_RM_GetSendState(struct ChaoJi_RM_Mcb *Msgcb);
 
-
-/*some example for how to use send*/
-void example(void)
-{
-	//-----------------Init--------------------------------------------------
-	struct ChaoJi_RM_Mcb lm_Mcb = *ChaoJi_RM_new(void);
-	//...
-	struct ChaoJi_RM_Mcb rsm_Mcb = *ChaoJi_RM_new(void);
-	//...
-	struct ChaoJi_URSM_Mcb ursm_Mcb = *ChaoJi_URSM_new(void);
-	//...
-	err_Cj errVal = ERR_OK;
-
-	// Send
-	uint8_t data1[] = {1, 2, 3, 4, 5,6,7,8,9};
-	lm_Mcb->t1_intvl = 8;
-	lm_Mcb->t2_intvl = 100;
-	lm_Mcb->t3_intvl = 10000;
-	lm_Mcb->resend_times = 3;//超时重发次数
-	ChaoJi_RM_write(lm_Mcb, data1, sizeof(data1), &errVal);
-
-	uint8_t data2[] = {1, 2, 3, 4, 5};
-	lm_Mcb->t1_intvl = 250;	 //重发间隔
-	lm_Mcb->resend_times = 4;//超时重发次数
-	ChaoJi_RM_write(rsm_Mcb, data2, sizeof(data2), &errVal);
-	
-	uint8_t data3[] = {1, 2, 3, 4, 5,6,7};
-	ChaoJi_URSM_send(ursm_Mcb, data3, sizeof(data3),);
-};
 
 #endif // CHAOJI_SEND_H.
