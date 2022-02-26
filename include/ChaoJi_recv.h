@@ -30,12 +30,12 @@
 #include "ChaoJi_Trans.h"
 #include "malloc.h"
 
-
-#define SM_ACK (0)
-#define LM_ACK (1)
+/* move to ChaoJi_Trans.h file
+#define SM_ACK 	(0)
+#define LM_ACK 	(1)
 #define LM_NACK (2)
 #define LM_EndACK (3)
-
+*/
 
 /**
  * @brief   After RM data has been received, Application layer will trigger ChaoJi_RM_Notify to notify

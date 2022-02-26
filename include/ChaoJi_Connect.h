@@ -94,4 +94,11 @@ void ChaoJi_RM_accept(struct ChaoJi_RM_Mcb *Msgcb, void (* accept)(struct ChaoJi
  */
 void ChaoJi_RM_Close(struct ChaoJi_RM_Mcb *Msgcb);
 
+/**
+ * @brief   obtain the mcb object by the corresponding mcb's type.
+ * @param   Pointer to the message cotrol block type. 
+ * @retval  the mcb object pointer
+ */
+struct ChaoJi_RM_Mcb *Mcb_Get(enum Mcb_type type);
+
 #endif // CHAOJI_CONNECT_H.

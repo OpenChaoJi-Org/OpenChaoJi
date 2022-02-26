@@ -103,4 +103,90 @@ void ChaoJi_RM_Close(struct ChaoJi_RM_Mcb *Msgcb)
     return;
 }
 
+/**
+ * @brief   obtain the mcb object by the corresponding mcb's type.
+ * @param   Pointer to the message cotrol block type. 
+ * @retval  the mcb object pointer
+ */
+struct ChaoJi_RM_Mcb *Mcb_Get(enum Mcb_type type)
+{	
+	static struct ChaoJi_RM_Mcb *send_rsm_mcb = NULL;
+	static struct ChaoJi_RM_Mcb *send_lm_mcb = NULL;
+	static struct ChaoJi_RM_Mcb *recv_rsm_mcb = NULL;
+	static struct ChaoJi_RM_Mcb *recv_lm_mcb = NULL;
+
+	struct ChaoJi_RM_Mcb *mcb = NULL;
+
+	switch (type)
+	{
+		case SEND_RSMMCB:
+			if (NULL == send_rsm_mcb){
+				send_rsm_mcb = ChaoJi_RM_new();
+				if (send_rsm_mcb != NULL){
+					//the sending rsm key parameter initialization
+					send_rsm_mcb->t1_intvl = 250;	 //重发间隔
+					send_rsm_mcb->resend_times = 4;//超时重发次数
+					send_rsm_mcb->rcved_ack_flag = 0xff;
+				}
+				else{
+					//error
+				}
+			}
+			mcb = send_rsm_mcb;
+			break;
+			
+		case SEND_LMMCB:
+			if (NULL == send_lm_mcb){
+				send_lm_mcb = ChaoJi_RM_new();
+				if (send_lm_mcb != NULL){
+					//the sending lm key parameter initialization
+					send_lm_mcb->t1_intvl = 8;	//LM传输中信息帧发送间隔
+					send_lm_mcb->t2_intvl = 100;//控制帧超时间隔
+					send_lm_mcb->t3_intvl = 10000;//长消息传输超时间隔
+					send_lm_mcb->resend_times = 3;//LM超时重发次数  
+					send_lm_mcb->msg_type = LM_TYPE;
+					send_lm_mcb->rcved_ack_flag = 0xff;
+				}
+				else{
+					//error
+				}
+			}
+			mcb = send_lm_mcb;
+			break;
+			
+		case RECV_RSMMCB:
+			if (NULL == recv_rsm_mcb){
+				recv_rsm_mcb = ChaoJi_RM_new();
+				if (recv_rsm_mcb != NULL){
+					//key parameter initialization
+					
+				}
+				else{
+					//error
+				}
+			}
+			mcb = recv_rsm_mcb;
+			break;
+			
+		case RECV_LMMCB:
+			if (NULL == recv_lm_mcb){
+				recv_lm_mcb = ChaoJi_RM_new();
+				if (recv_rsm_mcb != NULL){
+					//key parameter initialization
+
+				}
+				else{
+					//error
+				}
+			}
+			mcb = recv_lm_mcb;
+			break;
+		default: 
+			//error log
+			break;
+	}
+	
+	return mcb;
+}
+
 

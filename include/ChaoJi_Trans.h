@@ -39,22 +39,50 @@ typedef short err_Cj;
 #define LM_TYPE		(1)
 #define RSM_TYPE	(0)
 
+//ack type defintions
+#define SM_ACK 	(0)
+#define LM_ACK 	(1)
+#define LM_NACK (2)
+#define LM_EndACK (3)
+
+
+//PDU Format value defintions
+#define PF_LMIF   (0x34)//the information frame of long message
+#define PF_RSMIF  (0x35)//the information frame of reliable short message
+#define PF_URSMIF (0x36)//the information frame of unreliable short message
+#define PF_RMCF	  (0x37)//the control frame of reliable message
+
 // CAN Source Address defintions.
-#define MACID_EVCC	0x5f
-#define MACID_SECC	0x25
+#define MACID_EVCC	(0x5f)
+#define MACID_SECC	(0x25)
+
+#ifndef NULL
+	#define NULL 0//((void *)0)
+#endif
+
+
+enum Mcb_type{
+	SEND_RSMMCB = 0,
+	SEND_LMMCB,
+	RECV_RSMMCB,
+	RECV_LMMCB
+};
+
 // ChaoJi communication states defintions.
 // Connect(s0) data transfer(s1) wait ack(s2) wait end(s3) connection close(s4).
 enum Cj_Com_state{
-//	RSM_S0	= 0,
-//	RSM_S1,
-//	RSM_S2,
+	RSM_S0	= 0,
+	RSM_S1,
+	RSM_S2,
+	//definition for RSM sending state
 	RSM_IDLE	= 0,
 	RSM_WAIT_RESP_ACK,
 	RSM_SEND_END,
 	RSM_SEND_FAILURE,
-//	LM_S0	= 10,
-//	LM_S1,
-//	LM_S2,
+	LM_S0	= 10,
+	LM_S1,
+	LM_S2,
+	//definition for LM sending state
 	LM_IDLE		= 10,
 	LM_SENT_CONN,
 	LM_RCVD_RESP,
@@ -82,6 +110,13 @@ struct ChaoJi_RM_Mcb
     uint16_t rcved_tfs;		// recved Total fram size: ACK's total frame size.
 	uint16_t crt_seq;		// Current sequence no: ACK's start sequence number included.
 	uint16_t rst_seq;		// Request seq no.
+
+	uint8_t  rcved_ack_flag;	//0:SM_ACK 1:LM_ACK 2:LM_NACK 3:LM_EndACK
+	uint8_t  lm_acksf_idx;		//lM ACK's start frame index to be received
+	uint8_t  lm_acktfs;			//LM ACK's total frames to be received
+	uint8_t  lm_ack_fin_nof;	//LM ACK's finally numbers of total frames to be received
+	uint16_t lm_ack_fin_nob;	//lM ACK's finally numbers of total bytes to be received
+	
 	uint8_t *recved_flag;	// Received flag: include all ACK, NACK and ANDACK, number of pending data frames and its initial sequence number.
 	uint8_t pause_flag;		// Transfer pause.
 	uint8_t trans_fin_flag;	// Transfer finish flag.
@@ -136,7 +171,7 @@ typedef union
 	{
 		uint32_t sa		:8; // Source address.
         uint32_t ps		:8; // Destination address.
-		uint32_t pf		:8; // PDU type.
+		uint32_t pf		:8; // PDU Format.
 		uint32_t dp		:1; // Data Page.
 		uint32_t edp	:1; // Extended data page.
 		uint32_t p		:3; // Priority.
@@ -151,5 +186,12 @@ struct Can_Pdu
     uint8_t	can_dlc;
     uint8_t	data[8];
 };
+
+/*
+#include "ChaoJi_Connect.h"
+#include "ChaoJi_recv.h"
+#include "ChaoJi_Send.h"
+#include ¡°ChaoJi_Mem.h¡±
+*/
 
 #endif // CHAOJI_TRANS_H.

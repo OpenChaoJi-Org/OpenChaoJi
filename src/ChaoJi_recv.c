@@ -84,7 +84,7 @@ err_Cj ChaoJi_RSM_Recv(struct Can_Pdu * Pdu,struct ChaoJi_RM_Mcb *Msgcb)
 {
 
     uint8_t i=0;
-    Msgcb->MsgType=RSM_TYPE;
+    Msgcb->msg_type=RSM_TYPE;
     for(i=0;i<7;i++)
     {
         Msgcb->sm_data[i]=Pdu->data[i];
@@ -123,7 +123,7 @@ err_Cj ChaoJi_LM_Recv(struct Can_Pdu * Pdu,struct ChaoJi_RM_Mcb *Msgcb)
         uint8_t state=Msgcb->cj_rm_com_state;
 
         //some para correct check ?
-        Msgcb->MsgType=LM_TYPE;
+        Msgcb->msg_type=LM_TYPE;
         Msgcb->tfs=Pdu->data[1];// Total fram size: ACK's total frame size.
         Msgcb->len=(Pdu->data[2]|(Pdu->data[3]<<8));//data len in byte
         Msgcb->rcved_tfs=0;
@@ -250,10 +250,12 @@ err_Cj ChaoJi_LM_Recv(struct Can_Pdu * Pdu,struct ChaoJi_RM_Mcb *Msgcb)
 err_Cj ChaoJi_ACK_SM_Recv(struct Can_Pdu * Pdu,struct ChaoJi_RM_Mcb *Msgcb)
 {
      //notify send
+	 
+     ChaoJi_ACK_Notify(Pdu,Msgcb);
 }
 
 err_Cj ChaoJi_ACK_LM_Recv(struct Can_Pdu * Pdu,struct ChaoJi_RM_Mcb *Msgcb)
 {
     //notify send
-
+    ChaoJi_ACK_Notify(Pdu,Msgcb);
 }
