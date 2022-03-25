@@ -29,14 +29,28 @@
 
 #include "ChaoJi_Trans.h"
 
-/*allocate memory*/
-void* Mem_get(uint16_t size);//TBD
+struct pMem
+{
+	void *payload;//pointer to the actual buffer
+	uint8_t	used_flag;//buffer usage flag 0:free 1:used
+	uint16_t len;// length of this buffer
+};
 
-//void* mem_get(*pmem,size);//TBD
+
+/**
+ * @brief   Initializes the pbuf module. 
+ * @param   None.
+ * @retval  None.
+ */
+void Mem_Init(void);
+
+
+/*allocate memory*/
+void *Mem_get(uint16_t size);
 
 
 /*free memory*/
-uint8_t Mem_free(void* pbuff);//TBD
+void Mem_free(void *pbuff);
 
 
-#endif // CHAOJI_SEND_H.
+#endif // CHAOJI_MEM_H.

@@ -54,6 +54,7 @@ void ChaoJi_URM_Send_Notify(struct ChaoJi_URM_Mcb *Msgcb);
  */
 err_Cj ChaoJi_ACK_Notify(struct Can_Pdu *Pdu,struct ChaoJi_RM_Mcb *Msgcb);
 
+
 /**
 * @brief   Reliable message send, Deal with application data buffer and request Msgcb
 *          according to data buffer length then call ChaoJi_RM_SendProcess.
@@ -75,10 +76,14 @@ err_Cj ChaoJi_RM_write(struct ChaoJi_RM_Mcb *Msgcb, uint8_t* data, uint32_t leng
 * @retval  ERR_OK If there is an error in sending.
 */
 <<<<<<< HEAD
+<<<<<<< HEAD
 err_Cj ChaoJi_URSM_send(struct ChaoJi_Urm_Mcb *Msgcb, uint8_t* data, uint32_t length);
 =======
 err_Cj ChaoJi_URSM_send(struct ChaoJi_Urm_Mcb *Msgcb, uint8_t* data, uint32_t length, err_Cj *err);
 >>>>>>> 891a7b0d69f7d552151d0d86204c7ce699018c5f
+=======
+err_Cj ChaoJi_URSM_send(struct ChaoJi_URM_Mcb *Msgcb, uint8_t* data, uint32_t length);
+>>>>>>> 4fd69b8e18d8bdbb76f2c4cc0eb1691cc8acd07a
 
 /**
 * @brief   Relaible message send state machine, connection established, sending data, pause, 
@@ -105,15 +110,16 @@ err_Cj ChaoJi_Output(struct Can_Pdu *pdu);
 
 /**
 <<<<<<< HEAD
+<<<<<<< HEAD
 * @brief   Deal with data link layer to make real traffic by using CAN PDU，
 *			usage：After ChaoJi_URSM_write, ChaoJi_RM_TxProcess or rferenced by receiv procedure
+=======
+* @brief   This function is called back in 1 millisecond period, which is used to send the timer timing，
+>>>>>>> 4fd69b8e18d8bdbb76f2c4cc0eb1691cc8acd07a
 * @param   None.
 * @retval  None.
 */
-void ChaoJi_Send_1msTimeTick(void)
-{
-	
-}
+void ChaoJi_Send_1msTimeTick(void);
 
 
 /**

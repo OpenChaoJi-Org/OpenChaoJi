@@ -24,8 +24,7 @@
  *
  *
  */
-#ifndef CHAOJI_SEND_H
-#define CHAOJI_SEND_H
+
 
 #include <stdint.h>
 //#include "include/ChaoJi_Trans.h"
@@ -35,7 +34,7 @@ enum Cj_Com_state RSM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb);
 enum Cj_Com_state LM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb);
 err_Cj RSM_SentData(struct ChaoJi_RM_Mcb *Msgcb);
 err_Cj LM_DoConnect(struct ChaoJi_RM_Mcb *Msgcb);
-void LM_CloseConnect(struct ChaoJi_RM_Mcb *Msgcb);
+err_Cj LM_CloseConnect(struct ChaoJi_RM_Mcb *Msgcb);
 err_Cj LM_SentData(struct ChaoJi_RM_Mcb *Msgcb,uint8_t sndFrameNo);
 err_Cj LM_SentNAck(struct ChaoJi_RM_Mcb *Msgcb);
 
@@ -84,26 +83,26 @@ err_Cj ChaoJi_RM_write(struct ChaoJi_RM_Mcb *Msgcb, uint8_t* data, uint32_t leng
 
 	if (length <= 8)//reliable short message
 	{
-		memcpy(Msgcb->sm_data,data,length);//put the sending data into buffer
+		memcpy(Msgcb->snd_buf,data,length);//put the sending data into buffer
 		Msgcb->msg_type = RSM_TYPE;
 		Msgcb->snd_len = length;
 		error = RSM_SentData(Msgcb);
 		Msgcb->snd_state = RSM_WAIT_RESP_ACK;
 		Msgcb->t1_cnt = Msgcb->t1_intvl;
+		Msgcb->rcved_ack_flag = 0xff;
 	} 
 	else //long message
 	{
 		//get memory and put data into buffer
-		Msgcb->snd_buf = (uint8_t*)mem_get(length);
+		/*Msgcb->snd_buf = (uint8_t*)Mem_get(length);
 		if (Msgcb->snd_buf == NULL){
-			//error log
 			return ERR_ERR;
-		}
+		}*/
 		memcpy(Msgcb->snd_buf,data,length);
 		
 		Msgcb->msg_type = LM_TYPE;
 		Msgcb->snd_len = length;
-		Msgcb->snd_total_frames = length/7+1;
+		Msgcb->snd_total_frames = length/7+(((length%7)==0)?0:1);
 		Msgcb->snd_frame_cnt = 0;
 
 
@@ -114,6 +113,7 @@ err_Cj ChaoJi_RM_write(struct ChaoJi_RM_Mcb *Msgcb, uint8_t* data, uint32_t leng
 		Msgcb->t2_cnt = Msgcb->t2_intvl;
 		Msgcb->t3_cnt = Msgcb->t3_intvl;
 		Msgcb->snd_state = LM_SENT_CONN;
+		Msgcb->rcved_ack_flag = 0xff;
 	}
 
 	return error;
@@ -140,7 +140,7 @@ err_Cj ChaoJi_URSM_write(struct ChaoJi_Urm_Mcb *Msgcb, uint8_t* data, uint32_t l
 	return error;
 }*/
 
-err_Cj ChaoJi_URSM_send(struct ChaoJi_Urm_Mcb *Msgcb, uint8_t* data, uint32_t length)
+err_Cj ChaoJi_URSM_send(struct ChaoJi_URM_Mcb *Msgcb, uint8_t* data, uint32_t length)
 {
 	struct Can_Pdu pdu;
 	
@@ -344,6 +344,7 @@ enum Cj_Com_state RSM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 				Msgcb->resend_cnt++;
 				if (Msgcb->resend_cnt <= Msgcb->resend_times){
 					error = RSM_SentData(Msgcb);
+					Msgcb->t1_cnt = Msgcb->t1_intvl;
 				}
 				else{
 					Msgcb->t1_cnt = -1;
@@ -418,7 +419,7 @@ enum Cj_Com_state LM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 			if (Msgcb->rcved_ack_flag == LM_ACK){
 				//保存k,根据应答发送LM(n), send_cnt置1,开启LMS_T1,关LMS_T2,保持S1
 				//after received LM_ACK,start sending LM(n) data frame, set the send_cnt to 1,start the timer LMS_T1 and close timer LMS_T2.
-				error = LM_SentData(Msgcb,Msgcb->crt_seq);
+				error = LM_SentData(Msgcb,Msgcb->lm_acksf_idx);
 				Msgcb->snd_frame_cnt = 1;
 				Msgcb->t1_cnt = Msgcb->t1_intvl;
 				Msgcb->t2_cnt = -1;
@@ -433,31 +434,31 @@ enum Cj_Com_state LM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 			{
 				//期望发送为长消息最后一帧
 				//send the last frame of the LM
-				if ((Msgcb->snd_frame_cnt + Msgcb->crt_seq - 1) == Msgcb->snd_total_frames){
+				if ((Msgcb->snd_frame_cnt + Msgcb->lm_acksf_idx) == Msgcb->snd_total_frames){
 					//发送LM(lm_tfra),send_cnt加1，关闭LMS_T1,开启LMS_T2,进入S3等待结束确认状态
 					error = LM_SentData(Msgcb,Msgcb->snd_total_frames);
 					Msgcb->snd_frame_cnt++;
 					Msgcb->t1_cnt = -1;
-					Msgcb->t1_cnt = Msgcb->t2_intvl;
+					Msgcb->t2_cnt = Msgcb->t2_intvl;
 					Msgcb->snd_state = LM_WAIT_FIN_ACK;
 					Msgcb->resend_cnt = 0;
 				}
 				//期望发送帧为接收方请求的最后一帧，且非长消息最后一帧
 				//send the last frame requested by the receiver
-				else if (Msgcb->snd_frame_cnt == Msgcb->tfs){
+				else if (Msgcb->snd_frame_cnt == (Msgcb->lm_acktfs - 1)){
 					//发送 LM(n+send_cnt),send_cnt加1,关闭LMS_T1,开启LMS_T2,进入S2等待应答确认状态
 					//send LM(n+send_cnt),the send_cnt add 1,close the timer LMS_T1,start the timer LMS_T2
-					error = LM_SentData(Msgcb,Msgcb->crt_seq + Msgcb->snd_frame_cnt);
+					error = LM_SentData(Msgcb,Msgcb->lm_acksf_idx + Msgcb->snd_frame_cnt);
 					Msgcb->snd_frame_cnt++;
 					Msgcb->t1_cnt = -1;
-					Msgcb->t1_cnt = Msgcb->t2_intvl;
+					Msgcb->t2_cnt = Msgcb->t2_intvl;
 					Msgcb->snd_state = LM_WAIT_RESP_ACK;
 					Msgcb->resend_cnt = 0;
 				}
 				else{
 					//发送LM(n+send_cnt),send_cnt加1,重置LMS_T1,保持 S1
 					//data sending,send LM(n+send_cnt),the send_cnt add 1,reset the timer LMS_T1
-					error = LM_SentData(Msgcb,Msgcb->crt_seq + Msgcb->snd_frame_cnt);
+					error = LM_SentData(Msgcb,Msgcb->lm_acksf_idx + Msgcb->snd_frame_cnt);
 					Msgcb->snd_frame_cnt++;
 					Msgcb->t1_cnt = Msgcb->t1_intvl;
 				}
@@ -476,7 +477,6 @@ enum Cj_Com_state LM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 			if (Msgcb->rcved_ack_flag == LM_ACK){
 				//根据应答调整LM的帧序号为n, send_cnt 置 1, 开启LMS_T1,关闭LMS_T2, 进入S1
 				//after received LM_ACK,start sending LM(n) data frame, set the send_cnt to 1,start the timer LMS_T1,close LMS_T2
-				error = LM_SentData(Msgcb,Msgcb->crt_seq);
 				Msgcb->snd_frame_cnt = 1;
 				Msgcb->t1_cnt = Msgcb->t1_intvl;
 				Msgcb->t2_cnt = -1;
@@ -496,7 +496,7 @@ enum Cj_Com_state LM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 				//发送LM_NACK放弃连接
 				Msgcb->resend_cnt++;
 				if (Msgcb->resend_cnt <= Msgcb->resend_times){
-					error = LM_SentData(Msgcb,Msgcb->crt_seq + Msgcb->tfs - 1);//TBD 发送LM(n+k-1)
+					error = LM_SentData(Msgcb,Msgcb->lm_acksf_idx + Msgcb->lm_acktfs - 1);
 					Msgcb->t2_cnt = Msgcb->t2_intvl;
 				}
 				else{
@@ -519,7 +519,6 @@ enum Cj_Com_state LM_SendProcess(struct ChaoJi_RM_Mcb *Msgcb)
 		case LM_WAIT_FIN_ACK:
 			if (Msgcb->rcved_ack_flag == LM_ACK){
 				//根据应答调整LM的帧序号为n, send_cnt 置 1, 开启LMS_T1,关闭LMS_T2, 进入S1
-				error = LM_SentData(Msgcb,Msgcb->crt_seq);
 				Msgcb->snd_frame_cnt = 1;
 				Msgcb->t1_cnt = Msgcb->t1_intvl;
 				Msgcb->t2_cnt = -1;
@@ -748,4 +747,3 @@ void main(void)
 };
 */
 
-#endif // CHAOJI_SEND_H.

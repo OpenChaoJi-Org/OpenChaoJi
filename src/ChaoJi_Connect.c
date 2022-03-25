@@ -110,6 +110,8 @@ void ChaoJi_RM_Close(struct ChaoJi_RM_Mcb *Msgcb)
  */
 struct ChaoJi_RM_Mcb *Mcb_Get(enum Mcb_type type)
 {	
+	uint8_t* ptr = NULL;
+	
 	static struct ChaoJi_RM_Mcb *send_rsm_mcb = NULL;
 	static struct ChaoJi_RM_Mcb *send_lm_mcb = NULL;
 	static struct ChaoJi_RM_Mcb *recv_rsm_mcb = NULL;
@@ -127,6 +129,13 @@ struct ChaoJi_RM_Mcb *Mcb_Get(enum Mcb_type type)
 					send_rsm_mcb->t1_intvl = 250;	 //重发间隔
 					send_rsm_mcb->resend_times = 4;//超时重发次数
 					send_rsm_mcb->rcved_ack_flag = 0xff;
+					ptr = (uint8_t*)Mem_get(8);
+					if (ptr != NULL){
+						send_rsm_mcb->snd_buf = ptr;
+					}
+					else{
+						//error
+					}
 				}
 				else{
 					//error
@@ -146,6 +155,13 @@ struct ChaoJi_RM_Mcb *Mcb_Get(enum Mcb_type type)
 					send_lm_mcb->resend_times = 3;//LM超时重发次数  
 					send_lm_mcb->msg_type = LM_TYPE;
 					send_lm_mcb->rcved_ack_flag = 0xff;
+					ptr = (uint8_t*)Mem_get(64);//long message alloc 64 bytes buffer
+					if (ptr != NULL){
+						send_rsm_mcb->snd_buf = ptr;
+					}
+					else{
+						//error
+					}
 				}
 				else{
 					//error
